@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Truco - Hierarquia Oficial</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: url('https://png.pngtree.com/thumb_back/fh260/background/20230526/pngtree-video-of-many-playing-cards-falling-free-image_2650942.jpg');
+      background-size: cover;
+      background-position: center;
+      color: white;
+      text-align: center;
+    }
+    #mesa {
+      margin-top: 20px;
+    }
+    .mao {
+      margin: 20px;
+    }
+    .carta {
+      display: inline-block;
+      width: 90px;
+      height: 130px;
+      border: 2px solid white;
+      border-radius: 8px;
+      margin: 5px;
+      background: #222;
+      line-height: 30px;
+      font-size: 18px;
+      cursor: pointer;
+      padding-top: 20px;
+    }
+    .naipe {
+      font-size: 28px;
+    }
+    #acoes button {
+      margin: 5px;
+      padding: 10px;
+      font-size: 16px;
+    }
+    #log {
+      margin-top: 20px;
+      background: rgba(0,0,0,0.6);
+      padding: 10px;
+      border-radius: 8px;
+      height: 250px;
+      overflow-y: auto;
+    }
+    </style>
+</head>
+<body>
+  <h1>Truco - Contra IA</h1>
+  <div id="mesa">
+    <div class="mao" id="mao-jogador"></div>
+    <div class="mao" id="mao-ia"></div>
+  </div>
+  <div id="acoes">
+    <button onclick="chamar('truco')">Truco</button>
+    <button onclick="chamar('envido')">Envido</button>
+    <button onclick="chamar('flor')">Flor</button>
+    <button onclick="chamar('contra envido')">Contra Envido</button>
+    <button onclick="chamar('contra flor')">Contra Flor</button>
+  </div>
+  <div id="log"></div>
+
+  <script>
+    const naipes=["espadas","copas","ouros","bastos"];
+    const simbolos={espadas:"♠",copas:"♥",ouros:"♦",bastos:"♣"};
+    const valores=[1,2,3,4,5,6,7,10,11,12];
+    let baralho=[];
+    let maoJogador=[];
+    let maoIA=[];
+    let pontosJogador=0;
+    let pontosIA=0;
+    let rodadas=[];
+    let rodadaAtual=1;
+
+    function criarBaralho(){
+      baralho=[];
+      for(let n of naipes){
+        for(let v of valores){
+          baralho.push({naipe:n,valor:v});
+        }
+      }
+    }
+    function embaralhar(){
+      for(let i=baralho.length-1;i>0;i--){
+        const j=Math.floor(Math.random()*(i+1));
+        [baralho[i],baralho[j]]=[baralho[j],baralho[i]];
+      }
+    }
+    function distribuir(){
+      maoJogador=baralho.slice(0,3);
+      maoIA=baralho.slice(3,6);
+      rodadas=[];
+      rodadaAtual=1;
+      mostrarMao();
+    }
+    function mostrarMao(){
+      const divJog=document.getElementById("mao-jogador");
+      divJog.innerHTML="";
+      maoJogador.forEach((carta,i)=>{
+        const div=document.createElement("div");
+        div.className="carta";
+        div.innerHTML=`<div>${carta.valor}</div><div class="naipe">${simbolos[carta.naipe]}</div>`;
+        div.onclick=()=>jogarCarta(i);
+        divJog.appendChild(div);
+      });
+      const divIA=document.getElementById("mao-ia");
+      divIA.innerHTML="";
+      maoIA.forEach(()=>{
+        const div=document.createElement("div");
+        div.className="carta";
+        div.innerText="??";
+        divIA.appendChild(div);
+      });
+    }
+    function jogarCarta(indice){
+      const carta=maoJogador.splice(indice,1)[0];
+      log("Rodada "+rodadaAtual+": Você jogou "+carta.valor+" "+simbolos[carta.naipe]);
+      const cartaIA=jogadaIA();
+      rodadas.push({jogador:carta,ia:cartaIA});
+      rodadaAtual++;
+      mostrarMao();
+      if(rodadas.length===3){
+        decidirTruco();
+      }
+    }
+    function jogadaIA(){
+      const indice=Math.floor(Math.random()*maoIA.length);
+      const carta=maoIA.splice(indice,1)[0];
+      log("Rodada "+rodadaAtual+": IA jogou "+carta.valor+" "+simbolos[carta.naipe]);
+      return carta;
+    }
+
+    // Hierarquia oficial do truco
+    function forcaCarta(carta){
+      const n=carta.naipe;
+      const v=carta.valor;
+      if(v===1 && n==="espadas") return 14;
+      if(v===1 && n==="bastos") return 13;
+      if(v===7 && n==="espadas") return 12;
+      if(v===7 && n==="ouros") return 11;
+      if(v===3) return 10;
+      if(v===2) return 9;
+      if(v===1) return 8;
+      if(v===12) return 7;
+      if(v===11) return 6;
+      if(v===10) return 5;
+      if(v===7) return 4;
+      if(v===6) return 3;
+      if(v===5) return 2;
+      if(v===4) return 1;
+      return 0;
+    }
+
+    // Pontuação envido
+    function calcularEnvido(mao){
+      let melhor=0;
+      for(let i=0;i<mao.length;i++){
+        for(let j=i+1;j<mao.length;j++){
+          if(mao[i].naipe===mao[j].naipe){
+            let soma=(mao[i].valor<=7?mao[i].valor:0)+(mao[j].valor<=7?mao[j].valor:0)+20;
+            if(soma>melhor) melhor=soma;
+          }
+        }
+      }
+      return melhor;
+    }
+    function temFlor(mao){
+      return mao[0].naipe===mao[1].naipe && mao[1].naipe===mao[2].naipe;
+    }
+
+    function chamar(tipo){
+      log("Você chamou: "+tipo);
+      let resultado="";
+      if(tipo==="envido"||tipo==="contra envido"){
+        let ej=calcularEnvido(maoJogador);
+        let ei=calcularEnvido(maoIA);
+        if(ej>ei){pontosJogador+=2;resultado="Você venceu o envido";}
+        else if(ei>ej){pontosIA+=2;resultado="IA venceu o envido";}
+        else resultado="Empate no envido";
+      }
+      else if(tipo==="flor"||tipo==="contra flor"){
+        let fj=temFlor(maoJogador);
+        let fi=temFlor(maoIA);
+        if(fj&&!fi){pontosJogador+=3;resultado="Você venceu a flor";}
+        else if(fi&&!fj){pontosIA+=3;resultado="IA venceu a flor";}
+        else resultado="Nenhum tem flor";
+      }
+      else if(tipo==="truco"){
+        log("O truco será decidido após as 3 rodadas!");
+      }
+      log(resultado);
+      log("Placar: Jogador "+pontosJogador+" x "+pontosIA+" IA");
+    }
+
+    function decidirTruco(){
+      let vitoriasJog=0;
+      let vitoriasIA=0;
+      rodadas.forEach((r,i)=>{
+        let fj=forcaCarta(r.jogador);
+        let fi=forcaCarta(r.ia);
+        if(fj>fi){vitoriasJog++;log("Rodada "+(i+1)+": Você venceu");}
+        else if(fi>fj){vitoriasIA++;log("Rodada "+(i+1)+": IA venceu");}
+        else log("Rodada "+(i+1)+": Empate");
+      });
+      if(vitoriasJog>vitoriasIA){
+        pontosJogador+=2;
+        log("Você venceu o truco!");
+      }
+      else if(vitoriasIA>vitoriasJog){
+        pontosIA+=2;
+        log("IA venceu o truco!");
+      }
+      else {
+        log("Truco empatado!");
+      }
+      log("Placar final: Jogador "+pontosJogador+" x "+pontosIA+" IA");
+    }
+
+    function log(msg){
+      const div=document.getElementById("log");
+      div.innerHTML+=msg+"<br>";
+      div.scrollTop=div.scrollHeight;
+    }
+
+    // Inicialização
+    criarBaralho();
+    embaralhar();
+    distribuir();
+  </script>
+</body>
+</html>
